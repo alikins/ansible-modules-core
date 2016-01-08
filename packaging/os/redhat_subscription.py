@@ -85,19 +85,19 @@ options:
             - The type of unit to register, defaults to system
         required: False
         default: null
-        version_added: "2.x"  # TBD
+        version_added: "2.1"
     consumer_name:
         description:
             - Name of the system to register, defaults to the hostname
         required: False
         default: null
-        version_added: "2.x"  # TBD
+        version_added: "2.1"
     consumer_id:
         description:
-            - The existing system data is pulled from the server
+            - References an existing consumer ID to resume using a previous registration for this system. If the  system's identity certificate is lost or corrupted, this option allows it to resume using its previous identity and subscriptions. The default is to not specify a consumer ID so a new ID is created.
         required: False
         default: null
-        version_added: "2.x"  # TBD
+        version_added: "2.1"
 '''
 
 EXAMPLES = '''
