@@ -96,6 +96,7 @@ apt_repository: repo='ppa:nginx/stable'
 import glob
 import os
 import re
+import stat
 import tempfile
 
 try:
@@ -246,12 +247,20 @@ class SourcesList(object):
             result = apt_pkg.Config.FindDir(dirspec)
         return result
 
+    # TODO: likely a module_utils for this, use that instead -akl
+    def _file_mode(self, filename):
+        stat_info = os.stat(filename)
+        mode = stat_info[stat.ST_MODE]
+        return mode
+
     def load(self, file):
         group = []
         f = open(file, 'r')
+        mode = self._file_mode(file)
         for n, line in enumerate(f):
             valid, enabled, source, comment = self._parse(line)
-            group.append((n, valid, enabled, source, comment))
+            # mode is not really a per repo value, but we'll see if dump() ends up cleaner
+            group.append((n, valid, enabled, source, comment, mode))
         self.files[file] = group
 
     def save(self):
@@ -283,6 +292,7 @@ class SourcesList(object):
                 # If a mode is not provided, use DEFAULT_SOURCES_PERM for new files,
                 # but don't change the mode for existing files.
 
+
                 if self.module.params.get('mode', False):
                     # the arg spec specified a mode, use it for all changes.
                     this_mode = self.module.params.get('mode', DEFAULT_SOURCES_PERM)
@@ -299,10 +309,13 @@ class SourcesList(object):
                     os.remove(filename)
 
     def dump(self):
+        # dumpstruct is a dict keyed by file and the value is a txt blob of the sources
         dumpstruct = {}
         for filename, sources in self.files.items():
             if sources:
                 lines = []
+                # TODO: do we care about file mode changes in repo files with no sources?
+                file_mode = self._file_mode(filename)
                 for n, valid, enabled, source, comment in sources:
                     chunks = []
                     if not enabled:
@@ -313,6 +326,9 @@ class SourcesList(object):
                         chunks.append(comment)
                     chunks.append('\n')
                     lines.append(''.join(chunks))
+
+                # Add this so file mode only changes show up in the 'dump' output used to detect changes
+                lines.append('# sources filename: %s mode: %s' % (filename, file_mode))
                 dumpstruct[filename] = ''.join(lines)
         return dumpstruct
 
