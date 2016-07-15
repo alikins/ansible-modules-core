@@ -259,8 +259,7 @@ class SourcesList(object):
         mode = self._file_mode(file)
         for n, line in enumerate(f):
             valid, enabled, source, comment = self._parse(line)
-            # mode is not really a per repo value, but we'll see if dump() ends up cleaner
-            group.append((n, valid, enabled, source, comment, mode))
+            group.append((n, valid, enabled, source, comment))
         self.files[file] = group
 
     def save(self):
