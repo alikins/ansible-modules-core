@@ -99,6 +99,12 @@ import re
 import stat
 import tempfile
 
+import logging
+log = logging.getLogger('apt_repo')
+log_format = "%(asctime)s [%(name)s %(levelname)s] @%(filename)s:%(funcName)s:%(lineno)d - %(message)s"
+#logging.basicConfig(level=logging.INFO, format=log_format)
+logging.basicConfig(level=logging.DEBUG, format=log_format)
+
 try:
     import apt
     import apt_pkg
@@ -159,9 +165,9 @@ class SourcesList(object):
     def __iter__(self):
         '''Simple iterator to go over all sources. Empty, non-source, and other not valid lines will be skipped.'''
         for file, sources in self.files.items():
-            for n, valid, enabled, source, comment in sources:
+            for n, valid, enabled, source, comment, mode in sources:
                 if valid:
-                    yield file, n, enabled, source, comment
+                    yield file, n, enabled, source, comment, mode
         raise StopIteration
 
     def _expand_path(self, filename):
@@ -259,7 +265,7 @@ class SourcesList(object):
         mode = self._file_mode(file)
         for n, line in enumerate(f):
             valid, enabled, source, comment = self._parse(line)
-            group.append((n, valid, enabled, source, comment))
+            group.append((n, valid, enabled, source, comment, mode))
         self.files[file] = group
 
     def save(self):
@@ -269,7 +275,7 @@ class SourcesList(object):
                 fd, tmp_path = tempfile.mkstemp(prefix=".%s-" % fn, dir=d)
 
                 f = os.fdopen(fd, 'w')
-                for n, valid, enabled, source, comment in sources:
+                for n, valid, enabled, source, comment, mode in sources:
                     chunks = []
                     if not enabled:
                         chunks.append('# ')
@@ -312,10 +318,11 @@ class SourcesList(object):
         dumpstruct = {}
         for filename, sources in self.files.items():
             if sources:
+		for source in sources:
+	    		log.debug('filename: %s source: %s', filename, source)
                 lines = []
                 # TODO: do we care about file mode changes in repo files with no sources?
-                file_mode = self._file_mode(filename)
-                for n, valid, enabled, source, comment in sources:
+                for n, valid, enabled, source, comment, mode in sources:
                     chunks = []
                     if not enabled:
                         chunks.append('# ')
@@ -325,6 +332,7 @@ class SourcesList(object):
                         chunks.append(comment)
                     chunks.append('\n')
                     lines.append(''.join(chunks))
+                    file_mode = mode
 
                 # Add this so file mode only changes show up in the 'dump' output used to detect changes
                 lines.append('# sources filename: %s mode: %s' % (filename, file_mode))
@@ -336,21 +344,24 @@ class SourcesList(object):
             return old
         return new
 
-    def modify(self, file, n, enabled=None, source=None, comment=None):
+    def modify(self, file, n, enabled=None, source=None, comment=None, mode=None):
         '''
         This function to be used with iterator, so we don't care of invalid sources.
         If source, enabled, or comment is None, original value from line ``n`` will be preserved.
         '''
-        valid, enabled_old, source_old, comment_old = self.files[file][n][1:]
-        self.files[file][n] = (n, valid, self._choice(enabled, enabled_old), self._choice(source, source_old), self._choice(comment, comment_old))
+        valid, enabled_old, source_old, comment_old, mode_old = self.files[file][n][1:]
+        self.files[file][n] = (n, valid, self._choice(enabled, enabled_old), self._choice(source, source_old), self._choice(comment, comment_old), self._choice(mode, mode_old))
 
     def _add_valid_source(self, source_new, comment_new, file):
-        # We'll try to reuse disabled source if we have it.
+        log.debug('add_valid_source file=%s', file)
+	# We'll try to reuse disabled source if we have it.
         # If we have more than one entry, we will enable them all - no advanced logic, remember.
         found = False
-        for filename, n, enabled, source, comment in self:
+
+        file_mode = self.module.params.get('mode')
+        for filename, n, enabled, source, comment, mode in self:
             if source == source_new:
-                self.modify(filename, n, enabled=True)
+                self.modify(filename, n, enabled=True, mode=mode)
                 found = True
 
         if not found:
@@ -363,11 +374,12 @@ class SourcesList(object):
                 self.files[file] = []
 
             files = self.files[file]
-            files.append((len(files), True, True, source_new, comment_new))
+            files.append((len(files), True, True, source_new, comment_new, file_mode))
             self.new_repos.add(file)
 
     def add_source(self, line, comment='', file=None):
-        source = self._parse(line, raise_if_invalid_or_disabled=True)[2]
+        log.debug('base add_source file=%s', file)
+	source = self._parse(line, raise_if_invalid_or_disabled=True)[2]
 
         # Prefer separate files for new sources.
         self._add_valid_source(source, comment, file=file or self._suggest_filename(source))
@@ -417,6 +429,7 @@ class UbuntuSourcesList(SourcesList):
         return len(err) == 0
 
     def add_source(self, line, comment='', file=None):
+        log.debug('ubuntu add_source file=%s', file)
         if line.startswith('ppa:'):
             source, ppa_owner, ppa_name = self._expand_ppa(line)
 
@@ -434,7 +447,8 @@ class UbuntuSourcesList(SourcesList):
         else:
             source = self._parse(line, raise_if_invalid_or_disabled=True)[2]
             file = file or self._suggest_filename(source)
-        self._add_valid_source(source, comment, file)
+        
+	self._add_valid_source(source, comment, file)
 
     def remove_source(self, line):
         if line.startswith('ppa:'):
@@ -524,6 +538,8 @@ def main():
     sources_after = sourceslist.dump()
     changed = sources_before != sources_after
 
+    log.debug('sources_before=%s', sources_before)
+    log.debug('sources_after=%s', sources_after)
     if changed and module._diff:
         diff = []
         for filename in set(sources_before.keys()).union(sources_after.keys()):
