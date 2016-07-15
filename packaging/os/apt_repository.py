@@ -47,7 +47,7 @@ options:
         required: false
         default: 0644
         description:
-            - The octal mode for newly created files in sources.list.d
+            - The octal mode for files created in sources.list.d
         version_added: "1.6"
     update_cache:
         description:
@@ -279,10 +279,20 @@ class SourcesList(object):
                         self.module.fail_json(msg="Failed to write to file %s: %s" % (tmp_path, unicode(err)))
                 self.module.atomic_move(tmp_path, filename)
 
-                # allow the user to override the default mode
-                if filename in self.new_repos:
+                # If a mode is provided use it for new files and when updating files.
+                # If a mode is not provided, use DEFAULT_SOURCES_PERM for new files,
+                # but don't change the mode for existing files.
+
+                if self.module.params.get('mode', False):
+                    # the arg spec specified a mode, use it for all changes.
                     this_mode = self.module.params.get('mode', DEFAULT_SOURCES_PERM)
                     self.module.set_mode_if_different(filename, this_mode, False)
+                else:
+                    # no mode was specified, only apply the default mode to new files
+                    if filename in self.new_repos:
+                        this_mode = self.module.params.get('mode', DEFAULT_SOURCES_PERM)
+                        self.module.set_mode_if_different(filename, this_mode, False)
+
             else:
                 del self.files[filename]
                 if os.path.exists(filename):
@@ -453,7 +463,7 @@ def main():
         argument_spec=dict(
             repo=dict(required=True),
             state=dict(choices=['present', 'absent'], default='present'),
-            mode=dict(required=False, type='raw'),
+            mode=dict(required=False, default=None, type='raw'),
             update_cache = dict(aliases=['update-cache'], type='bool', default='yes'),
             filename=dict(required=False, default=None),
             # this should not be needed, but exists as a failsafe
