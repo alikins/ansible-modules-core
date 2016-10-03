@@ -440,6 +440,9 @@ def main():
     cmd = ' '.join([cmd, source, dest])
     cmdstr = cmd
     (rc, out, err) = module.run_command(cmd)
+
+    out = to_native(out)
+
     if rc:
         return module.fail_json(msg=err, rc=rc, cmd=cmdstr)
     else:
@@ -459,6 +462,7 @@ def main():
 
 # import module snippets
 from ansible.module_utils.basic import *
+from ansible.module_utils._text import to_native
 
 main()
 
