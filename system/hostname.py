@@ -43,13 +43,14 @@ EXAMPLES = '''
 - hostname: name=web01
 '''
 
+import os
 import socket
 from distutils.version import LooseVersion
 
 # import module snippets
-from ansible.module_utils.basic import *
-from ansible.module_utils.facts import *
-from ansible.module_utils._text import to_bytes, to_native
+from ansible.module_utils.basic import AnsibleModule, get_exception
+from ansible.module_utils.facts import Facts, get_platform, get_distribution, get_distribution_version, load_platform_subclass
+from ansible.module_utils._text import to_native
 
 
 class UnimplementedStrategy(object):
@@ -78,6 +79,7 @@ class UnimplementedStrategy(object):
         self.module.fail_json(
             msg='hostname module cannot be used on platform %s' % msg_platform)
 
+
 class Hostname(object):
     """
     This is a generic Hostname manipulation class that is subclassed
@@ -96,8 +98,8 @@ class Hostname(object):
         return load_platform_subclass(Hostname, args, kwargs)
 
     def __init__(self, module):
-        self.module       = module
-        self.name         = module.params['name']
+        self.module = module
+        self.name = module.params['name']
         if self.platform == 'Linux' and Facts(module).is_systemd_managed():
             self.strategy = SystemdStrategy(module)
         else:
@@ -114,6 +116,7 @@ class Hostname(object):
 
     def set_permanent_hostname(self, name):
         self.strategy.set_permanent_hostname(name)
+
 
 class GenericStrategy(object):
     """
@@ -193,7 +196,6 @@ class DebianStrategy(GenericStrategy):
             self.module.fail_json(msg="failed to update hostname: %s" %
                 str(err))
 
-# ===========================================
 
 class SLESStrategy(GenericStrategy):
     """
@@ -233,7 +235,6 @@ class SLESStrategy(GenericStrategy):
             self.module.fail_json(msg="failed to update hostname: %s" %
                 str(err))
 
-# ===========================================
 
 class RedHatStrategy(GenericStrategy):
     """
@@ -284,8 +285,6 @@ class RedHatStrategy(GenericStrategy):
                 str(err))
 
 
-# ===========================================
-
 class SystemdStrategy(GenericStrategy):
     """
     This is a Systemd hostname manipulation strategy class - it uses
@@ -332,8 +331,6 @@ class SystemdStrategy(GenericStrategy):
                 (rc, out, err))
 
 
-# ===========================================
-
 class OpenRCStrategy(GenericStrategy):
     """
     This is a Gentoo (OpenRC) Hostname manipulation strategy class - it edits
@@ -378,7 +375,6 @@ class OpenRCStrategy(GenericStrategy):
         finally:
             f.close()
 
-# ===========================================
 
 class OpenBSDStrategy(GenericStrategy):
     """
@@ -419,7 +415,6 @@ class OpenBSDStrategy(GenericStrategy):
             self.module.fail_json(msg="failed to update hostname: %s" %
                 str(err))
 
-# ===========================================
 
 class SolarisStrategy(GenericStrategy):
     """
@@ -452,7 +447,6 @@ class SolarisStrategy(GenericStrategy):
             self.module.fail_json(msg="Command failed rc=%d, out=%s, err=%s" %
                 (rc, out, err))
 
-# ===========================================
 
 class FreeBSDStrategy(GenericStrategy):
     """
@@ -506,12 +500,12 @@ class FreeBSDStrategy(GenericStrategy):
         finally:
             f.close()
 
-# ===========================================
 
 class FedoraHostname(Hostname):
     platform = 'Linux'
     distribution = 'Fedora'
     strategy_class = SystemdStrategy
+
 
 class SLESHostname(Hostname):
     platform = 'Linux'
@@ -522,110 +516,132 @@ class SLESHostname(Hostname):
     else:
         strategy_class = UnimplementedStrategy
 
+
 class OpenSUSEHostname(Hostname):
     platform = 'Linux'
     distribution = 'Opensuse '
     strategy_class = SystemdStrategy
+
 
 class ArchHostname(Hostname):
     platform = 'Linux'
     distribution = 'Arch'
     strategy_class = SystemdStrategy
 
+
 class RedHat5Hostname(Hostname):
     platform = 'Linux'
     distribution = 'Redhat'
     strategy_class = RedHatStrategy
+
 
 class RedHatServerHostname(Hostname):
     platform = 'Linux'
     distribution = 'Red hat enterprise linux server'
     strategy_class = RedHatStrategy
 
+
 class RedHatWorkstationHostname(Hostname):
     platform = 'Linux'
     distribution = 'Red hat enterprise linux workstation'
     strategy_class = RedHatStrategy
+
 
 class CentOSHostname(Hostname):
     platform = 'Linux'
     distribution = 'Centos'
     strategy_class = RedHatStrategy
 
+
 class CentOSLinuxHostname(Hostname):
     platform = 'Linux'
     distribution = 'Centos linux'
     strategy_class = RedHatStrategy
+
 
 class ScientificHostname(Hostname):
     platform = 'Linux'
     distribution = 'Scientific'
     strategy_class = RedHatStrategy
 
+
 class ScientificLinuxHostname(Hostname):
     platform = 'Linux'
     distribution = 'Scientific linux'
     strategy_class = RedHatStrategy
+
 
 class ScientificLinuxCERNHostname(Hostname):
     platform = 'Linux'
     distribution = 'Scientific linux cern slc'
     strategy_class = RedHatStrategy
 
+
 class OracleLinuxHostname(Hostname):
     platform = 'Linux'
     distribution = 'Oracle linux server'
     strategy_class = RedHatStrategy
+
 
 class AmazonLinuxHostname(Hostname):
     platform = 'Linux'
     distribution = 'Amazon'
     strategy_class = RedHatStrategy
 
+
 class DebianHostname(Hostname):
     platform = 'Linux'
     distribution = 'Debian'
     strategy_class = DebianStrategy
+
 
 class KaliHostname(Hostname):
     platform = 'Linux'
     distribution = 'Kali'
     strategy_class = DebianStrategy
 
+
 class UbuntuHostname(Hostname):
     platform = 'Linux'
     distribution = 'Ubuntu'
     strategy_class = DebianStrategy
+
 
 class LinuxmintHostname(Hostname):
     platform = 'Linux'
     distribution = 'Linuxmint'
     strategy_class = DebianStrategy
 
+
 class LinaroHostname(Hostname):
     platform = 'Linux'
     distribution = 'Linaro'
     strategy_class = DebianStrategy
+
 
 class GentooHostname(Hostname):
     platform = 'Linux'
     distribution = 'Gentoo base system'
     strategy_class = OpenRCStrategy
 
+
 class ALTLinuxHostname(Hostname):
     platform = 'Linux'
     distribution = 'Altlinux'
     strategy_class = RedHatStrategy
+
 
 class OpenBSDHostname(Hostname):
     platform = 'OpenBSD'
     distribution = None
     strategy_class = OpenBSDStrategy
 
+
 class SolarisHostname(Hostname):
     platform = 'SunOS'
     distribution = None
     strategy_class = SolarisStrategy
+
 
 class FreeBSDHostname(Hostname):
     platform = 'FreeBSD'
@@ -633,11 +649,9 @@ class FreeBSDHostname(Hostname):
     strategy_class = FreeBSDStrategy
 
 
-# ===========================================
-
 def main():
     module = AnsibleModule(
-        argument_spec = dict(
+        argument_spec=dict(
             name=dict(required=True)
         )
     )
