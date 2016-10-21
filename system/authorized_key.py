@@ -170,7 +170,6 @@ import re
 import shlex
 from operator import itemgetter
 
-
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.pycompat24 import get_exception
 from ansible.module_utils.urls import fetch_url
@@ -370,6 +369,7 @@ def parsekey(module, raw_key, rank=None):
     # check for options
     if type_index is None:
         return None
+        #return (raw_key, None, None, None, rank)
     elif type_index > 0:
         options = " ".join(key_parts[:type_index])
 
@@ -400,7 +400,7 @@ def readkeys(module, filename):
         else:
             # for an invalid line, just set the line
             # dict key to the line so it will be re-output later
-            keys[line] = (line, None, None, None, rank_index)
+            keys[line] = (line, 'skipped', None, None, rank_index)
     f.close()
     return keys
 
@@ -418,11 +418,6 @@ def writekeys(module, filename, keys):
         for key in ordered_new_keys:
             try:
                 (keyhash, key_type, options, comment, rank) = key
-
-                # comment line or invalid line, just leave it
-                if not key_type:
-                    key_line = key
-                    continue
 
                 option_str = ""
                 if options:
