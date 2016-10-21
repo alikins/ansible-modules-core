@@ -369,7 +369,6 @@ def parsekey(module, raw_key, rank=None):
     # check for options
     if type_index is None:
         return None
-        #return (raw_key, None, None, None, rank)
     elif type_index > 0:
         options = " ".join(key_parts[:type_index])
 
